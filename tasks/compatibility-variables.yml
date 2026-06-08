@@ -6,10 +6,11 @@
 # can be seen in our the https://github.com/elastic/ansible-elasticsearch/blob/main/test/integration/xpack.yml
 # integration test and in the Multi Node server documentation examples https://github.com/elastic/ansible-elasticsearch/blob/main/test/integration/xpack.yml
 - name: Set backward compatibility for deprecated es_enable_xpack variable
-  when: es_enable_xpack is defined and not es_enable_xpack
+  when: es_enable_xpack is defined and not es_enable_xpack | bool
   block:
   - name: Set fact oss_version when using es_enable_xpack
-    set_fact: oss_version=true
+    set_fact:
+      oss_version: true
   - name: Warn about deprecated es_enable_xpack variable
     debug:
       msg: "WARNING: es_enable_xpack variable is now deprecated. You should use oss_version instead"
@@ -30,7 +31,7 @@
     es_package_name: "elasticsearch-oss"
     es_other_package_name: "elasticsearch"
   when:
-    - oss_version
+    - oss_version | bool
 
 - name: Set the URL scheme to https if SSL/TLS is enabled
   set_fact:

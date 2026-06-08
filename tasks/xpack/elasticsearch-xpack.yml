@@ -3,7 +3,7 @@
 #Security configuration
 - name: include security/elasticsearch-security.yml
   include_tasks: security/elasticsearch-security.yml
-  when: not oss_version
+  when: not oss_version | bool
 
 #Make sure elasticsearch.keystore has correct Permissions
 - name: Set elasticsearch.keystore Permissions

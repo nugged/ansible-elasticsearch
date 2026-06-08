@@ -1,10 +1,12 @@
 ---
 - name: set fact allow_downgrade to no
-  set_fact: allow_downgrade=no
+  set_fact:
+    allow_downgrade: false
 
 - name: set fact allow_downgrade to yes
-  set_fact: allow_downgrade=yes
-  when: es_allow_downgrades
+  set_fact:
+    allow_downgrade: true
+  when: es_allow_downgrades | bool
 
 - name: Ensure libselinux-python on CentOS 6.x
   become: yes
@@ -16,14 +18,14 @@
   template:
     src: 'elasticsearch.repo'
     dest: '/etc/yum.repos.d/elasticsearch-{{ es_repo_name }}.repo'
-  when: es_use_repository and es_add_repository
+  when: es_use_repository | bool and es_add_repository | bool
 
 - name: RedHat - remove unused Elasticsearch repo
   become: yes
   file:
     path: '/etc/yum.repos.d/elasticsearch-{{ es_other_repo_name }}.repo'
     state: absent
-  when: es_use_repository
+  when: es_use_repository | bool
 
 - name: RedHat - include versionlock
   include_tasks: elasticsearch-RedHat-version-lock.yml
@@ -44,8 +46,8 @@
     name: '{{ es_package_name }}{% if es_version is defined and es_version != ""  %}-{{ es_version }}{% endif %}'
     state: present
     update_cache: yes
-    allow_downgrade: '{{ allow_downgrade }}'
-  when: es_use_repository and not ansible_check_mode
+    allow_downgrade: '{{ allow_downgrade | bool }}'
+  when: es_use_repository | bool and not ansible_check_mode
   register: redhat_elasticsearch_install_from_repo
   notify: restart elasticsearch
   until: redhat_elasticsearch_install_from_repo.rc == 0
@@ -63,6 +65,6 @@
   yum:
     name: '{% if es_custom_package_url is defined %}{{ es_custom_package_url }}{% else %}{{ es_rpm_url }}{% endif %}'
     state: present
-  when: not es_use_repository
+  when: not es_use_repository | bool
   register: elasticsearch_install_from_package
   notify: restart elasticsearch

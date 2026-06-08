@@ -1,10 +1,12 @@
 ---
 
 - name: set fact es_same_keystore
-  set_fact: es_same_keystore=false
+  set_fact:
+    es_same_keystore: false
 
 - name: set fact es_same_keystore if stores match
-  set_fact: es_same_keystore=true
+  set_fact:
+    es_same_keystore: true
   when: es_ssl_keystore == es_ssl_truststore
 
 - name: Ensure certificate directory exists
@@ -15,7 +17,7 @@
     owner: root
     group: "{{ es_group }}"
     mode: "750"
-  when: es_ssl_upload
+  when: es_ssl_upload | bool
 
 - name: Upload SSL/TLS keystore
   become: yes
@@ -25,7 +27,10 @@
     owner: "{{ es_user }}"
     group: "{{ es_group }}"
     mode: "640"
-  when: es_ssl_upload and es_ssl_keystore and es_ssl_truststore
+  when:
+    - es_ssl_upload | bool
+    - (es_ssl_keystore | default('') | length) > 0
+    - (es_ssl_truststore | default('') | length) > 0
   notify: restart elasticsearch
   register: copy_keystore
 
@@ -37,7 +42,10 @@
     owner: "{{ es_user }}"
     group: "{{ es_group }}"
     mode: "640"
-  when: es_ssl_upload and es_ssl_keystore and es_ssl_truststore
+  when:
+    - es_ssl_upload | bool
+    - (es_ssl_keystore | default('') | length) > 0
+    - (es_ssl_truststore | default('') | length) > 0
   notify: restart elasticsearch
   register: copy_truststore
 
@@ -52,7 +60,10 @@
   with_items:
     - "{{ es_ssl_key }}"
     - "{{ es_ssl_certificate }}"
-  when: es_ssl_upload and es_ssl_key and es_ssl_certificate
+  when:
+    - es_ssl_upload | bool
+    - (es_ssl_key | default('') | length) > 0
+    - (es_ssl_certificate | default('') | length) > 0
   #Restart if these change
   notify: restart elasticsearch
   register: copy_certificates
@@ -67,13 +78,18 @@
     mode: "640"
   #Restart if this changes
   notify: restart elasticsearch
-  when: es_ssl_upload and (es_ssl_certificate_authority is defined) and (es_ssl_certificate_authority|length > 0)
+  when:
+    - es_ssl_upload | bool
+    - es_ssl_certificate_authority is defined
+    - (es_ssl_certificate_authority | length) > 0
 
 - name: Set keystore password
   become: yes
   shell: echo "{{ es_ssl_keystore_password }}" | {{ es_home }}/bin/elasticsearch-keystore add -x -f 'xpack.security.{{ item }}.ssl.keystore.secure_password'
   no_log: True
-  when: es_ssl_keystore_password and (copy_keystore.changed or (es_same_keystore and copy_truststore.changed))
+  when:
+    - (es_ssl_keystore_password | default('') | length) > 0
+    - copy_keystore.changed or (es_same_keystore | bool and copy_truststore.changed)
   with_items:
     - http
     - transport
@@ -82,7 +98,9 @@
   become: yes
   shell: echo "{{ es_ssl_truststore_password }}" | {{ es_home }}/bin/elasticsearch-keystore add -x -f 'xpack.security.{{ item }}.ssl.truststore.secure_password'
   no_log: True
-  when: es_ssl_truststore_password and (copy_truststore.changed or (es_same_keystore and copy_keystore.changed))
+  when:
+    - (es_ssl_truststore_password | default('') | length) > 0
+    - copy_truststore.changed or (es_same_keystore | bool and copy_keystore.changed)
   with_items:
     - http
     - transport
@@ -90,7 +108,9 @@
 - name: Remove keystore password
   become: yes
   shell: "{{ es_home }}/bin/elasticsearch-keystore remove 'xpack.security.{{ item }}.ssl.keystore.secure_password'"
-  when: es_ssl_keystore_password == "" and (copy_keystore.changed or (es_same_keystore and copy_truststore.changed))
+  when:
+    - es_ssl_keystore_password == ""
+    - copy_keystore.changed or (es_same_keystore | bool and copy_truststore.changed)
   ignore_errors: yes
   with_items:
     - http
@@ -99,7 +119,9 @@
 - name: Remove truststore password
   become: yes
   shell: "{{ es_home }}/bin/elasticsearch-keystore remove 'xpack.security.{{ item }}.ssl.truststore.secure_password'"
-  when: es_ssl_truststore_password == "" and (copy_truststore.changed or (es_same_keystore and copy_keystore.changed))
+  when:
+    - es_ssl_truststore_password == ""
+    - copy_truststore.changed or (es_same_keystore | bool and copy_keystore.changed)
   ignore_errors: yes
   with_items:
     - http
@@ -109,7 +131,9 @@
   become: yes
   shell: echo "{{ es_ssl_key_password }}" | {{ es_home }}/bin/elasticsearch-keystore add -x -f 'xpack.security.{{ item }}.ssl.secure_key_passphrase'
   no_log: True
-  when: es_ssl_key_password and copy_certificates.changed
+  when:
+    - (es_ssl_key_password | default('') | length) > 0
+    - copy_certificates.changed
   with_items:
     - http
     - transport
