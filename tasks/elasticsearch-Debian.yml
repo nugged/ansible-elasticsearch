@@ -47,25 +47,43 @@
     apt:
       name: apt-transport-https
       state: present
+    when: es_add_repository | bool
 
-  - name: Debian - Add Elasticsearch repository key
-    apt_key:
-      url: '{{ es_apt_key }}'
-      id: '{{ es_apt_key_id }}'
+  - name: Debian - Remove legacy Elasticsearch repository files
+    file:
+      path: "{{ item }}"
+      state: absent
+    when: es_add_repository | bool
+    loop:
+      - "/etc/apt/sources.list.d/artifacts_elastic_co_packages_{{ es_repo_name | regex_replace('[^A-Za-z0-9]+', '_') }}_apt.list"
+      - "/etc/apt/sources.list.d/artifacts_elastic_co_packages_{{ es_other_repo_name | regex_replace('[^A-Za-z0-9]+', '_') }}_apt.list"
+      - "/etc/apt/sources.list.d/packages_elastic_co_elasticsearch_{{ es_repo_name | regex_replace('[^A-Za-z0-9]+', '_') }}_debian.list"
+      - "/etc/apt/sources.list.d/packages_elastic_co_elasticsearch_{{ es_other_repo_name | regex_replace('[^A-Za-z0-9]+', '_') }}_debian.list"
+      - "/etc/apt/sources.list.d/elastic-{{ es_repo_name }}.list"
+      - "/etc/apt/sources.list.d/elastic-{{ es_other_repo_name }}.list"
+      - /etc/apt/sources.list.d/elasticsearch.list
+      - /etc/apt/sources.list.d/elastic.list
+    register: es_legacy_repositories
+
+  - name: Debian - Add elasticsearch repository
+    ansible.builtin.deb822_repository:
+      name: elasticsearch
+      types: deb
+      uris: "{{ es_repo_base }}/packages/{{ es_repo_name }}/apt"
+      suites: stable
+      components: main
+      signed_by: "{{ es_apt_key | default(omit, true) }}"
       state: present
     when:
       - es_add_repository | bool
-      - (es_apt_key | default('') | length) > 0
+    register: es_repository
 
-  - name: Debian - Add elasticsearch repository
-    apt_repository:
-      repo: '{{ item.repo }}'
-      state: '{{ item.state }}'
-    when: es_add_repository | bool
-    with_items:
-      - { repo: "{{ es_apt_url_old }}", state: "absent" }
-      - { repo: "{{ es_apt_url }}", state: "present" }
-      - { repo: "{{ es_other_apt_url }}", state: "absent" }
+  - name: Debian - Update APT cache after Elasticsearch repository change
+    apt:
+      update_cache: yes
+    when:
+      - es_add_repository | bool
+      - es_repository.changed or es_legacy_repositories.changed
 
 - name: Include optional user and group creation.
   when: (es_user_id is defined) and (es_group_id is defined)
