@@ -11,6 +11,14 @@ cluster.name: elasticsearch
 node.name: {{inventory_hostname}}
 {% endif %}
 
+{% if es_disable_auto_security | bool and es_version is version('8.0.0', '>=') and es_config['xpack.security.enabled'] is not defined %}
+xpack.security.enabled: false
+{% endif %}
+
+{% if es_disable_auto_security | bool and es_version is version('8.0.0', '>=') and es_config['xpack.security.http.ssl.enabled'] is not defined %}
+xpack.security.http.ssl.enabled: false
+{% endif %}
+
 #################################### Paths ####################################
 
 # Path to directory containing configuration (this file and logging.yml):
